@@ -1,11 +1,12 @@
 // ==UserScript==
 // @name         WISDOM Timetable
 // @namespace    https://github.com/AJ-cubes/WISDOM-Timetable
-// @version      2025.4.0
-// @description  Alt+T shows current/next lessons. Alt+P shows tomorrow's books, PE status, and birthdays.
+// @version      2025.4.1
+// @description  Enhances WISDOM Timetable with keyboard shortcuts and overlays: Alt+T opens a full‑screen view of today’s current and upcoming lessons with subject links, highlights the active period, and shows birthdays; Alt+P displays tomorrow’s timetable, required books, and PE status, with interactive book toggling to mark whether a book is needed.
 // @author       AJ-cubes
 // @match        *://*/*
 // @noframes
+// @require      https://cdn.jsdelivr.net/npm/js-confetti@latest/dist/js-confetti.browser.js
 // @grant        GM_getValue
 // @grant        GM_setValue
 // @updateURL    https://github.com/AJ-cubes/WISDOM-Timetable/raw/main/WISDOM-Timetable.meta.js
@@ -51,7 +52,7 @@
     const mins = t => { const [h, m] = t.split(':').map(Number); return h * 60 + m; };
     const nowMins = () => { const d = new Date(); return d.getHours() * 60 + d.getMinutes(); };
     const getSkippedSetForDow = dow => new Set(SKIPPED_PERIODS_BY_DOW[dow] ? SKIPPED_PERIODS_BY_DOW[dow][0] : []);
-    const getSkippedPeriodForDow = dow => SKIPPED_PERIODS_BY_DOW[dow] ? SKIPPED_PERIODS_BY_DOW[dow][1] : -1;
+    const getSkippedPeriodForDow = dow => SKIPPED_PERIODS_BY_DOW[dow] ? SKIPPED_PERIODS_BY_DOW[dow][1] : NaN;
 
     const topDoc = window.top.document;
 
@@ -177,6 +178,7 @@
         const close = () => {
             overlay.remove();
             topDoc.body.style.overflow = prevOverflow;
+            if (birthdayInterval) clearInterval(birthdayInterval);
         };
 
         closeBtn.addEventListener('click', close);
@@ -291,7 +293,7 @@
     const params = new URLSearchParams(window.location.search);
     const isTimetable = params.get('timetable') === 'true';
     const isPackMode = params.get('pack') === 'true';
-    const yearGroup = 8;
+    let birthdayInterval = null;
 
     if (onClassroom) {
         window.addEventListener('load', () => {
@@ -352,6 +354,12 @@
                 timetable.scrollIntoView();
 
                 const tables = timetable.querySelectorAll("table.welcomett") || [];
+
+                const userName = document.querySelector('a[title="View profile"]').innerText;
+                const yearGroup = parseInt(userName.match(/\[(\d{2})\1[A-Z]\d\]/)?.[1] || 0);
+                const jsConfetti = new JSConfetti();
+                jsConfetti.canvas.style.zIndex = '1000000';
+                jsConfetti.canvas.style.pointerEvents = 'none';
 
                 if (isPackMode) {
                     let tomorrowTable;
@@ -485,11 +493,16 @@
                     }
                 }
 
-                if (highlightIndex >= skippedPeriod) highlightIndex += 1;
+                if (!isNaN(skippedPeriod) && highlightIndex >= skippedPeriod) highlightIndex += 1;
 
                 const happyBirthday = ((list) => {
                     list = list.filter(birthday => birthday && birthday.trim());
                     if (list.length === 0) return null;
+                    const youIndex = list.findIndex(name => name === 'You');
+                    if (youIndex >= 0) {
+                        const you = list.splice(youIndex, 1)[0];
+                        list.push(you);
+                    }
                     const joined = list.length === 1
                     ? list[0]
                     : list.length === 2
@@ -501,9 +514,17 @@
                     .innerHTML.split('<br>')
                     .filter(birthday => birthday.includes(String(yearGroup).padStart(2, '0')))
                     .map(birthday => {
+                        if (birthday.includes(userName)) {
+                            birthdayInterval = setInterval(() => {
+                                jsConfetti.addConfetti({
+                                    confettiNumber: 300
+                                })
+                            }, 1000);
+                            return 'You';
+                        }
                         const words = birthday.split(/\s+/);
                         const uppercaseIndex = words.findIndex(word => word === word.toUpperCase());
-                        return uppercaseIndex >= 0 ? words.slice(0, uppercaseIndex).join(' ') : words;
+                        return uppercaseIndex >= 0 ? words.slice(0, uppercaseIndex).join(' ') : words.join(' ');
                     })
                 );
 
