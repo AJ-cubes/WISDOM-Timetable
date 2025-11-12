@@ -317,9 +317,9 @@
                     }
                 });
                 GM_setValue('classDict', classDict);
+                alert('Classroom links updated! Closing now...');
+                window.close();
             });
-            alert('Classroom links updated! Closing now...');
-            window.close();
         });
     }
 
