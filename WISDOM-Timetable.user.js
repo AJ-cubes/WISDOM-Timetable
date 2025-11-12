@@ -1,14 +1,15 @@
 // ==UserScript==
 // @name         WISDOM Timetable
 // @namespace    https://github.com/AJ-cubes/WISDOM-Timetable
-// @version      2025.4.1
-// @description  Enhances WISDOM Timetable with keyboard shortcuts and overlays: Alt+T opens a full‑screen view of today’s current and upcoming lessons with subject links, highlights the active period, and shows birthdays; Alt+P displays tomorrow’s timetable, required books, and PE status, with interactive book toggling to mark whether a book is needed.
+// @version      2025.4.2
+// @description  Enhances WISDOM Timetable with keyboard shortcuts and overlays: Alt+T opens a full‑screen view of today’s current and upcoming lessons with subject links, highlights the active period, and shows birthdays; Alt+P displays tomorrow’s timetable, required books, and PE status, with interactive book toggling to mark whether a book is needed. Open Tampermonkey and select the metadata to update.
 // @author       AJ-cubes
 // @match        *://*/*
 // @noframes
 // @require      https://cdn.jsdelivr.net/npm/js-confetti@latest/dist/js-confetti.browser.js
 // @grant        GM_getValue
 // @grant        GM_setValue
+// @grant        GM_registerMenuCommand
 // @updateURL    https://github.com/AJ-cubes/WISDOM-Timetable/raw/main/WISDOM-Timetable.meta.js
 // @downloadURL  https://github.com/AJ-cubes/WISDOM-Timetable/raw/main/WISDOM-Timetable.user.js
 // ==/UserScript==
@@ -16,20 +17,7 @@
 (function() {
     'use strict';
 
-    const dictionary = {
-        "DT": "Design Technology",
-        "SC": "Science",
-        "PE": "Physical Education",
-        "EN": "English",
-        "CX": "Chinese",
-        "IS": "I&S",
-        "MA": "Mathematics",
-        "SP": "Spanish",
-        "TP": "Tutor Period",
-        "FR": "French",
-        "EX": "EAP",
-        "CQ": "Chinese Mastery"
-    };
+    const classNames = GM_getValue('classNames', {});
 
     const CA_DICT = {
         "D6": "Visual Arts",
@@ -67,7 +55,7 @@
     }
 
     function getDisplayName(code, room) {
-        if (dictionary[code.replace(/[^a-zA-Z]/g, '').toUpperCase()]) return dictionary[code.replace(/[^a-zA-Z]/g, '').toUpperCase()];
+        if (classNames[code.replace(/[^a-zA-Z]/g, '').toUpperCase()]) return classNames[code.replace(/[^a-zA-Z]/g, '').toUpperCase()];
         if (CA_DICT[room.slice(0, 2)]) return CA_DICT[room.slice(0, 2)];
         return code;
     }
@@ -247,6 +235,26 @@
         }
     }, true);
 
+    GM_registerMenuCommand("Check Timetable", () => {
+        window.open("https://wisdom.wis.edu.hk/?timetable=true");
+    });
+
+    GM_registerMenuCommand("Check Books", () => {
+        window.open("https://wisdom.wis.edu.hk/?timetable=true&pack=true");
+    });
+
+    GM_registerMenuCommand("Update Classroom Links", () => {
+        window.open("https://classroom.google.com/h?timetable=true");
+    });
+
+    GM_registerMenuCommand("Update Class Names", () => {
+        window.open("https://wisdom.wis.edu.hk/local/mis/calendar/fulltimetable.php?timetable=true");
+    });
+
+    GM_registerMenuCommand("Check for Updates", () => {
+        window.open("https://github.com/AJ-cubes/WISDOM-Timetable/raw/main/WISDOM-Timetable.user.js");
+    });
+
     function extractWeekdayOrTomorrow(str) {
         const weekdays = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
@@ -288,15 +296,17 @@
         observer.observe(document.body, { childList: true, subtree: true });
     }
 
-    const onWISDOM = location.href.includes('wisdom.wis.edu.hk');
-    const onClassroom = location.href.includes('classroom.google.com/h');
+    const onWISDOM = location.href.includes('https://wisdom.wis.edu.hk');
+    const onClassroom = location.href.includes('https://classroom.google.com/h');
+    const onTimetable = location.href.includes('https://wisdom.wis.edu.hk/local/mis/calendar/fulltimetable.php');
     const params = new URLSearchParams(window.location.search);
     const isTimetable = params.get('timetable') === 'true';
     const isPackMode = params.get('pack') === 'true';
     let birthdayInterval = null;
 
-    if (onClassroom) {
+    if (onClassroom && isTimetable) {
         window.addEventListener('load', () => {
+            history.replaceState(null, '', `${location.origin}${location.pathname}`);
             waitForClassList((links) => {
                 const classDict = {};
                 links.forEach(a => {
@@ -308,10 +318,25 @@
                 });
                 GM_setValue('classDict', classDict);
             });
+            alert('Classroom links updated! Closing now...');
+            window.close();
         });
     }
 
-    if (onWISDOM && isTimetable) {
+    if (onTimetable && isTimetable) {
+        window.addEventListener('load', () => {
+            history.replaceState(null, '', `${location.origin}${location.pathname}`);
+            const classNamesDictionary = {};
+            document.querySelectorAll('tr td.ttprd').forEach(cell => {
+                classNamesDictionary[cell.innerText.split('\n')[1].replace(/[^a-zA-Z]/g, '').toUpperCase()] = cell.innerText.split('\n')[0];
+            });
+            GM_setValue('classNames', classNamesDictionary);
+            alert('Class names updated! Closing now...');
+            window.close();
+        });
+    }
+
+    if (onWISDOM && isTimetable && !onTimetable) {
         window.addEventListener('load', () => {
             setTimeout(() => {
                 history.replaceState(null, '', `${location.origin}${location.pathname}`);
