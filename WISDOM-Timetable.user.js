@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         WISDOM Timetable
 // @namespace    https://github.com/AJ-cubes/WISDOM-Timetable
-// @version      2025.4.2.1
+// @version      2026.1
 // @description  Enhances WISDOM Timetable with keyboard shortcuts and overlays: Alt+T opens a full‑screen view of today’s current and upcoming lessons with subject links, highlights the active period, and shows birthdays; Alt+P displays tomorrow’s timetable, required books, and PE status, with interactive book toggling to mark whether a book is needed. Open Tampermonkey and select the metadata to update.
 // @author       AJ-cubes
 // @match        *://*/*
@@ -10,6 +10,7 @@
 // @grant        GM_getValue
 // @grant        GM_setValue
 // @grant        GM_registerMenuCommand
+// @grant        GM_xmlhttpRequest
 // @updateURL    https://github.com/AJ-cubes/WISDOM-Timetable/raw/main/WISDOM-Timetable.meta.js
 // @downloadURL  https://github.com/AJ-cubes/WISDOM-Timetable/raw/main/WISDOM-Timetable.user.js
 // ==/UserScript==
@@ -26,7 +27,7 @@
     };
 
     const SKIPPED_PERIODS_BY_DOW = {
-        1: [['ttprd4'], 3]
+        1: [['ttprd3'], 2]
     };
 
     const periodTimes = [
@@ -231,15 +232,15 @@
             e.preventDefault();
             e.stopPropagation();
             e.stopImmediatePropagation();
-            window.open(url, '_blank');
+            window.open(url);
         }
     }, true);
 
-    GM_registerMenuCommand("Check Timetable", () => {
+    GM_registerMenuCommand("Check Timetable (Alt + T)", () => {
         window.open("https://wisdom.wis.edu.hk/?timetable=true");
     });
 
-    GM_registerMenuCommand("Check Books", () => {
+    GM_registerMenuCommand("Check Books (Alt + P)", () => {
         window.open("https://wisdom.wis.edu.hk/?timetable=true&pack=true");
     });
 
@@ -252,7 +253,33 @@
     });
 
     GM_registerMenuCommand("Check for Updates", () => {
-        window.open("https://github.com/AJ-cubes/WISDOM-Timetable/raw/main/WISDOM-Timetable.user.js");
+        const currentVersion = GM_info.script.version;
+
+        fetch("https://raw.githubusercontent.com/AJ-cubes/WISDOM-Timetable/refs/heads/main/WISDOM-Timetable.meta.js")
+            .then(function(response) {
+            if (!response.ok) {
+                throw new Error("Network response was not ok: " + response.status);
+            }
+            return response.text();
+        })
+            .then(function(text) {
+            const match = text.match(/@version\s+([^\s]+)/);
+            if (match) {
+                const latestVersion = match[1];
+                if (latestVersion !== currentVersion) {
+                    if (confirm('Update Available! Update now?')) {
+                        window.open("https://github.com/AJ-cubes/WISDOM-Timetable/raw/main/WISDOM-Timetable.user.js");
+                    }
+                } else {
+                    alert('You are up to date!');
+                }
+            } else {
+                console.warn("No @version found in metadata file");
+            }
+        })
+            .catch(function(err) {
+            console.error("Failed to fetch metadata:", err);
+        });
     });
 
     function extractWeekdayOrTomorrow(str) {
@@ -294,6 +321,49 @@
         });
 
         observer.observe(document.body, { childList: true, subtree: true });
+    }
+
+    function getBestURL(classDict, safeDisplayName, safeCode, safeRoom) {
+        const weights = {
+            displayName: 3,
+            code: 2,
+            room: 1
+        };
+
+        let bestScore = 0;
+        let bestURL = null;
+
+        for (const [key, value] of Object.entries(classDict)) {
+            let score = 0;
+
+            function calcScore(safeThing, weight) {
+                if (!safeThing) return 0;
+                const tokens = safeThing.split(" ").filter(Boolean);
+                if (tokens.length === 0) return 0;
+
+                let matches = 0;
+                for (const token of tokens) {
+                    if (key.includes(token)) {
+                        matches++;
+                    }
+                }
+                return (matches / tokens.length) * weight;
+            }
+
+            score += calcScore(safeDisplayName, weights.displayName);
+            score += calcScore(safeCode, weights.code);
+            score += calcScore(safeRoom, weights.room);
+
+            if (score > bestScore) {
+                bestScore = score;
+                bestURL = value;
+            }
+        }
+
+        return {
+            url: bestURL,
+            found: bestScore > 0
+        };
     }
 
     const onWISDOM = location.href.includes('https://wisdom.wis.edu.hk');
@@ -478,25 +548,10 @@
                     const cell = lessonRow.querySelector(`td.${p.class}`);
                     const { code, room } = parseCell(cell);
                     const displayName = getDisplayName(code, room);
-                    let found = false;
 
-                    const safeCode = code.toLowerCase().replace(/^0+/, '');
-                    const safeRoom = room.toLowerCase();
-                    const safeDisplayName = displayName.toLowerCase();
+                    const {url, found} = getBestURL(classDict, code.toLowerCase().replace(/^0+/, ''), room.toLowerCase(), displayName.toLowerCase());
+                    URLs.push(found === true ? url : null);
 
-                    for (const [key, value] of Object.entries(classDict)) {
-                        if (
-                            (safeDisplayName && key.includes(safeDisplayName)) ||
-                            (safeCode && key.includes(safeCode)) ||
-                            (safeRoom && key.includes(safeRoom))
-                        ) {
-                            URLs.push(value);
-                            found = true;
-                            break;
-                        }
-                    }
-
-                    if (found === false) URLs.push(null);
                     return `${skippedToday.has(p.class) ? '<span class="cross">' : ''}${found === true ? '<span class="emoji">🔗</span>' : ''}${p.label} - ${displayName}${room === '' ? '' : ` at ${room}`}${found === true ? '<span class="emoji">🔗</span>' : ''}${skippedToday.has(p.class) ? '</span>' : ''}`;
                 });
 
