@@ -27,7 +27,7 @@
     };
 
     const SKIPPED_PERIODS_BY_DOW = {
-        1: [['ttprd3'], 2]
+        1: [['ttprd2'], 1]
     };
 
     const periodTimes = [
@@ -552,7 +552,7 @@
                     const {url, found} = getBestURL(classDict, code.toLowerCase().replace(/^0+/, ''), room.toLowerCase(), displayName.toLowerCase());
                     URLs.push(found === true ? url : null);
 
-                    return `${skippedToday.has(p.class) ? '<span class="cross">' : ''}${found === true ? '<span class="emoji">🔗</span>' : ''}${p.label} - ${displayName}${room === '' ? '' : ` at ${room}`}${found === true ? '<span class="emoji">🔗</span>' : ''}${skippedToday.has(p.class) ? '</span>' : ''}`;
+                    return `${found === true ? '<span class="emoji">🔗</span>' : ''}${skippedToday.has(p.class) ? '<span style="text-decoration: line-through #FF0000 calc(1em / 3)">' : ''}${p.label} - ${displayName}${room === '' ? '' : ` at ${room}`}${skippedToday.has(p.class) ? '</span>' : ''}${found === true ? '<span class="emoji">🔗</span>' : ''}`;
                 });
 
                 if (schoolDay === yearGroup - 6) {
