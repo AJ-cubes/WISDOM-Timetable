@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         WISDOM Timetable
 // @namespace    https://github.com/AJ-cubes/WISDOM-Timetable
-// @version      2026.1.1
+// @version      2026.1.2
 // @description  Enhances WISDOM Timetable with keyboard shortcuts and overlays: Alt+T opens a full‑screen view of today’s current and upcoming lessons with subject links, highlights the active period, and shows birthdays; Alt+P displays tomorrow’s timetable, required books, and PE status, with interactive book toggling to mark whether a book is needed. Open Tampermonkey and select the metadata to update.
 // @author       AJ-cubes
 // @match        *://*/*
@@ -266,7 +266,8 @@
             const match = text.match(/@version\s+([^\s]+)/);
             if (match) {
                 const latestVersion = match[1];
-                if (latestVersion !== currentVersion) {
+                console.log(latestVersion, currentVersion)
+                if (currentVersion !== latestVersion) {
                     if (confirm('Update Available! Update now?')) {
                         window.open("https://github.com/AJ-cubes/WISDOM-Timetable/raw/main/WISDOM-Timetable.user.js");
                     }
@@ -540,8 +541,8 @@
                 const now = nowMins();
                 const todayDow = new Date().getDay();
                 const skippedToday = getSkippedSetForDow(todayDow);
-                const skippedPeriod = getSkippedPeriodForDow(todayDow);
                 const classDict = GM_getValue('classDict', {});
+                let skippedPeriod = getSkippedPeriodForDow(todayDow);
                 let URLs = [];
 
                 let lines = periodTimes.map(p => {
@@ -569,6 +570,7 @@
                     const end = mins(p.end);
                     if ((now >= start && now <= end) || now < start) {
                         highlightIndex = assemblyToday === true ? i + 1 : i;
+                        skippedPeriod = assemblyToday === true ? skippedPeriod + 1 : skippedPeriod;
                         break;
                     }
                 }
