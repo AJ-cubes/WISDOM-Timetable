@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         WISDOM Timetable
 // @namespace    https://github.com/AJ-cubes/WISDOM-Timetable
-// @version      2026.1.2
-// @description  Enhances WISDOM Timetable with keyboard shortcuts and overlays: Alt+T opens a full‑screen view of today’s current and upcoming lessons with subject links, highlights the active period, and shows birthdays; Alt+P displays tomorrow’s timetable, required books, and PE status, with interactive book toggling to mark whether a book is needed. Open Tampermonkey and select the metadata to update.
+// @version      2026.2
+// @description  Enhances WISDOM Timetable with keyboard shortcuts and overlays: Alt+T opens a full‑screen view of today’s current and upcoming lessons with subject links, highlights the active period, and shows birthdays; Alt+P displays tomorrow’s timetable, required books, and PE status, with interactive book toggling to mark whether a book is needed; Alt+B shows a list of everyone who's birthday is 'today'. Open Tampermonkey and select the metadata to update.
 // @author       AJ-cubes
 // @match        *://*/*
 // @noframes
@@ -224,7 +224,8 @@
 
         const links = {
             KeyT: 'https://wisdom.wis.edu.hk/?timetable=true',
-            KeyP: 'https://wisdom.wis.edu.hk/?timetable=true&pack=true'
+            KeyP: 'https://wisdom.wis.edu.hk/?timetable=true&pack=true',
+            KeyB: 'https://wisdom.wis.edu.hk/?timetable=true&birthday=true'
         };
 
         const url = links[e.code];
@@ -242,6 +243,10 @@
 
     GM_registerMenuCommand("Check Books (Alt + P)", () => {
         window.open("https://wisdom.wis.edu.hk/?timetable=true&pack=true");
+    });
+
+    GM_registerMenuCommand("Birthdays (Alt + B)", () => {
+        window.open("https://wisdom.wis.edu.hk/?timetable=true&birthday=true");
     });
 
     GM_registerMenuCommand("Update Classroom Links", () => {
@@ -373,6 +378,7 @@
     const params = new URLSearchParams(window.location.search);
     const isTimetable = params.get('timetable') === 'true';
     const isPackMode = params.get('pack') === 'true';
+    const isBirthday = params.get('birthday') === 'true';
     let birthdayInterval = null;
 
     if (onClassroom && isTimetable) {
@@ -410,14 +416,17 @@
     if (onWISDOM && isTimetable && !onTimetable) {
         window.addEventListener('load', () => {
             setTimeout(() => {
+                const originalURL = location.href;
                 history.replaceState(null, '', `${location.origin}${location.pathname}`);
 
                 const timetable = [...document.querySelectorAll("div > h5")].find(h5 => h5.textContent.trim() === "Timetable")?.parentElement;
                 timetable.id = "timetable";
 
+                const birthdayElement = document.querySelector('#inst7857');
+
                 const style = topDoc.createElement('style');
                 style.textContent = `
-                    #inst7857, #timetable {
+                    #inst7857${isBirthday ? "" : ", #timetable"} {
                         box-shadow:
                             0 0 12px 4px rgba(0,255,0,0.9),
                             0 0 24px 8px rgba(0,255,0,0.8),
@@ -431,7 +440,7 @@
                         cursor: pointer !important;
                     }
 
-                    #inst7857:hover, #timetable:hover, .line:hover {
+                    #inst7857:hover${isBirthday ? "" : ", #timetable:hover"}, .line:hover {
                         transform: scale(1.05) !important;
                         filter: brightness(1.2) !important;
                         transition: transform 0.3s ease, filter 0.3s ease !important;
@@ -439,15 +448,18 @@
                 `;
                 topDoc.head.appendChild(style);
 
-                timetable.addEventListener('click', () => {
-                    window.open(`https://wisdom.wis.edu.hk/?timetable=true${isPackMode ? '&pack=true' : ''}`, '_self');
+                if (!isBirthday) {
+                    timetable.addEventListener('click', () => {
+                        window.open(originalURL, '_self');
+                    });
+                }
+
+                birthdayElement.addEventListener('click', () => {
+                    window.open(originalURL, '_self');
                 });
 
-                document.querySelector('#inst7857').addEventListener('click', () => {
-                    window.open(`https://wisdom.wis.edu.hk/?timetable=true${isPackMode ? '&pack=true' : ''}`, '_self');
-                });
-
-                timetable.scrollIntoView();
+                if (!isBirthday) timetable.scrollIntoView();
+                if (isBirthday) birthdayElement.scrollIntoView();
 
                 const tables = timetable.querySelectorAll("table.welcomett") || [];
 
@@ -519,6 +531,13 @@
                     };
 
                     buildOverlay(lines, undefined, clickEvent);
+                    return;
+                }
+
+                if (isBirthday) {
+                    const birthdays = ['<span class="emoji">🎉</span> Happy Birthday <span class="emoji">🎉</span>', ...birthdayElement.querySelector('.content small').innerHTML.split('<br>').map(name => name.split(" ").slice(0, -1).join(" ")).filter(name => name !== "")];
+                    console.log(birthdays);
+                    buildOverlay(birthdays, 0);
                     return;
                 }
 
