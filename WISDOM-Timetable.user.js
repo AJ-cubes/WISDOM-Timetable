@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         WISDOM Timetable
 // @namespace    https://github.com/AJ-cubes/WISDOM-Timetable
-// @version      2026.2
+// @version      2026.2.1
 // @description  Enhances WISDOM Timetable with keyboard shortcuts and overlays: Alt+T opens a full‑screen view of today’s current and upcoming lessons with subject links, highlights the active period, and shows birthdays; Alt+P displays tomorrow’s timetable, required books, and PE status, with interactive book toggling to mark whether a book is needed; Alt+B shows a list of everyone who's birthday is 'today'. Open Tampermonkey and select the metadata to update.
 // @author       AJ-cubes
 // @match        *://*/*
@@ -271,7 +271,6 @@
             const match = text.match(/@version\s+([^\s]+)/);
             if (match) {
                 const latestVersion = match[1];
-                console.log(latestVersion, currentVersion)
                 if (currentVersion !== latestVersion) {
                     if (confirm('Update Available! Update now?')) {
                         window.open("https://github.com/AJ-cubes/WISDOM-Timetable/raw/main/WISDOM-Timetable.user.js");
@@ -279,12 +278,7 @@
                 } else {
                     alert('You are up to date!');
                 }
-            } else {
-                console.warn("No @version found in metadata file");
             }
-        })
-            .catch(function(err) {
-            console.error("Failed to fetch metadata:", err);
         });
     });
 
@@ -535,8 +529,7 @@
                 }
 
                 if (isBirthday) {
-                    const birthdays = ['<span class="emoji">🎉</span> Happy Birthday <span class="emoji">🎉</span>', ...birthdayElement.querySelector('.content small').innerHTML.split('<br>').map(name => name.split(" ").slice(0, -1).join(" ")).filter(name => name !== "")];
-                    console.log(birthdays);
+                    const birthdays = ['<span class="emoji">🎉</span> Happy Birthday <span class="emoji">🎉</span>', ...birthdayElement.querySelector('.content small').innerHTML.split('<br>').map(name => name.split(" ").slice(0, -1).join(" ")).filter(name => name !== "").sort((a, b) => { const regex = /\[(.*?)\]/; return a.match(regex)[1].localeCompare(b.match(regex)[1]); }).reverse()];
                     buildOverlay(birthdays, 0);
                     return;
                 }
